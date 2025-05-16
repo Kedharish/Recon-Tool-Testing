@@ -1,0 +1,844 @@
+import pytest
+from playwright.sync_api import sync_playwright
+import random
+import re
+from asyncio import wait_for
+from random import randint
+import page
+from playwright.sync_api import Page, expect, sync_playwright
+import time
+from playwright.sync_api import sync_playwright
+
+#----------------------------------------------IMPORTS------------------------------------------------------------------
+
+#---------------------------------This is for file upload (adhoc run) & Auth -------------------------------------------
+Main_source = 0
+def test_adhoc_run_auth(playwright: sync_playwright):
+   firefox_browser = playwright.firefox
+   browser = firefox_browser.launch(headless=False, slow_mo=1000)
+   context = browser.new_context()
+   context.tracing.start(screenshots=True, snapshots=True)
+   page = context.new_page()
+
+   # Login
+   page.goto("http://43.205.231.72:8080/levarusrecon/authentication/login")
+   page.get_by_placeholder("Email ID").fill("surya.a@levarus.com")
+   page.get_by_placeholder("Password").fill("1234")
+   page.get_by_text("submit").click()
+
+   # Hover over Run and click Adhoc Run
+   page.locator("span:has-text('Run')").nth(1).hover()
+   page.locator("span:has-text('Adhoc Run')").nth(1).click()
+
+   # Select Process
+   page.locator("span.mat-mdc-select-placeholder").first.click()
+   page.wait_for_selector("mat-option", state="visible")
+   page.locator("input[formcontrolname='searchTextProcess']").fill("179")
+   page.wait_for_timeout(1000)
+   page.get_by_text("179 - GL and Way 4 switch- recon(2 way1-1)").click()
+
+   # === Source File 1 ===
+   # Click 1st upload button
+   page.locator("button[style='border: none;']").nth(0).click()
+   # Find file input after first button click
+   input1 = page.locator("input[type='file']").first
+   input1.set_input_files(
+      r"C:\Users\TR1\PycharmProjects\PythonProject\Recon Testing files path\primaryUPDATED 8.xlsx"
+   )
+   page.wait_for_timeout(2000)
+
+   # === Source File 2 ===
+   # Click 2nd upload button
+   page.locator("button[style='border: none;']").nth(1).click()
+   # Wait for DOM to possibly re-render input
+   page.wait_for_timeout(1000)
+   # Re-locate file input — now should point to second one
+   input2 = page.locator("input[type='file']").nth(1)
+   input2.set_input_files(
+      r"C:\Users\TR1\PycharmProjects\PythonProject\Recon Testing files path\referenceUpdated 6.xlsx"
+   )
+   # Wait before submit
+   page.wait_for_timeout(2000)
+   # Start Recon Process
+   page.get_by_text("Start Recon Process").click()
+   page.locator("span:has-text('Authorization')").nth(0).hover()
+   page.locator("span:has-text('Transaction Approval')").nth(0).click()
+   time.sleep(5)
+   page.get_by_placeholder("Search").fill("179")
+   page.get_by_placeholder("Search").press("Enter")
+   time.sleep(3)
+   page.get_by_role("button", name="priority").nth(0).click()
+
+#-------------------------------------------END OF THE CODE---------------------------------------------------
+
+
+#--------------------------------------THIS IS FOR USER CREATION AND LOGIN --------------------------------
+
+# generate a unique user
+random_numb = random.randint(100, 1000)
+user_name = f"Auto{random_numb}"
+user_email_id = f"auto{random_numb}@gmail.com"
+password = "1234"
+
+def test_user_creation():
+    with sync_playwright() as p:
+        # 1) Launch browser
+        browser = p.firefox.launch(headless=False, slow_mo=1000)
+        context = browser.new_context()
+        context.tracing.start(screenshots=True, snapshots=True)
+        page = context.new_page()
+
+        # 2) Login
+        page.goto("http://43.205.231.72:8080/levarusrecon/authentication/login")
+        page.get_by_placeholder("Email ID").fill("surya.a@levarus.com")
+        page.get_by_placeholder("Password").fill("1234")
+        page.get_by_role("button", name="submit").click()
+        page.wait_for_load_state("networkidle")
+
+        # 3) Navigate to User Master
+        page.locator("span:has-text('settings')").click()
+        page.get_by_text("user master").click()
+
+        # 4) Open Create User dialog
+        page.get_by_role("button", name="Create User").click()
+        page.wait_for_timeout(2000)
+
+        # 5) Fill in user details
+        page.locator("input[formcontrolname='user_name']").fill(user_name)
+        page.locator("input[formcontrolname='email']").fill(user_email_id)
+        page.locator("input[formcontrolname='password']").fill(password)
+
+        # 6) Select Department
+        page.locator("mat-select[formcontrolname='userDepartment']").click()
+        page.wait_for_selector("mat-option", state="visible")
+        page.get_by_text("093542 - Accounts").click()
+
+        # 7) Select Role
+        page.locator("mat-select[formcontrolname='selectRole']").click()
+        page.wait_for_selector("mat-option", state="visible")
+        page.locator("mat-option", has_text="Approver").click()
+
+        # 8) Set Active = Yes
+        page.locator("mat-select[formcontrolname='active']").click()
+        page.wait_for_selector("mat-option", state="visible")
+        page.locator("mat-option", has_text="Yes").click()
+
+        # 9) Click the exact "Create" button
+        create_btn = page.get_by_role("button", name="Create", exact=True)
+        create_btn.wait_for(state="visible", timeout=5000)
+        create_btn.click()
+
+        # 10) Click the 'SA' circle and then Logout
+        page.locator("div.initial-circle").click()   # clicks the <div class="initial-circle">SA</div>
+        page.get_by_text("Logout").click()
+
+        # 11) Wait a bit and tear down
+        page.wait_for_timeout(3000)
+        context.tracing.stop(path="trace_user_creation.zip")
+        context.close()
+        browser.close()
+
+#-----------------------------------------------End of Code-------------------------------------------------------------
+# To test with valid email / password
+# -----------------------------------------------------------------------------------------------------------------------
+
+def test_login_page(playwright: sync_playwright):
+    chromium_browser = playwright.chromium
+    browser = chromium_browser.launch(headless=False)
+    context = browser.new_context()  # this is like an incognito web page
+    page = context.new_page()
+    page.goto("http://43.205.231.72:8080/levarusrecon/authentication/login")
+    page.get_by_placeholder("Email ID").fill("surya.a@levarus.com")
+    page.get_by_placeholder("Password").fill("1234")
+    page.get_by_text("submit").click()
+    print("Login Done")
+    time.sleep(5)
+#-----------------------------------------------End of Code-------------------------------------------------------------
+# TO TEST SOURCE CREATION SCREEN
+
+#-----------------------------------------------------------------------------------------------------------------------
+# SOURCE CREATION POSITIVE FLOW , VIEW AND MODIFY THE SOURCE
+
+def test_source_creation_postiveflow_view_modify(playwright: sync_playwright):
+
+   firefox_browser = playwright.firefox
+
+   browser = firefox_browser.launch(headless=False,slow_mo=1000) # for slow navigation
+
+   context = browser.new_context()
+
+   context.tracing.start(screenshots=True, snapshots=True)
+
+   page = context.new_page()
+
+   # Login
+
+   page.goto("http://43.205.231.72:8080/levarusrecon/authentication/login")
+
+   page.get_by_placeholder("Email ID").fill("surya.a@levarus.com")
+
+   page.get_by_placeholder("Password").fill("1234")
+
+   page.get_by_text("submit").click()
+
+   # Hover over Basic Recon Setup (second match is usually the visible one)
+
+   page.locator("span:has-text('Basic Recon Setup')").nth(1).hover()
+
+   # Click Source Data Configuration (second match or by class)
+
+   page.locator("span:has-text('Source Data Configuration')").nth(1).click()
+
+   page.get_by_role("button",name= " Add Source ").click()
+
+   randomnumber = random.randint(1, 100000)
+
+   page.get_by_placeholder("Source Name").fill(f"autotest_{randomnumber}")
+
+   # Click the 'Source Type' dropdown to open the options and select file upload
+
+   page.get_by_role("combobox", name="Source Type").click()
+
+   page.get_by_role("option", name="File Upload").click()
+
+   # Click the 'File Type' dropdown to open the options and select Excel
+
+   page.get_by_role("combobox", name="File Type").click()
+
+   page.get_by_role("option", name="Excel").click()
+
+   # Click the 'Delimiter' dropdown to open the options and select 0
+
+   page.get_by_role("combobox", name="Delimiter").click()
+
+   page.get_by_role("option", name="0").click()
+
+   # Click the 'Status' dropdown to open the options and select Active
+
+   page.get_by_role('combobox',name="Status").click()
+
+   page.get_by_role('option', name="Inactive").click()
+
+   # Click the 'Source control' dropdown to open the options and select Our source
+
+   page.get_by_role('combobox', name="Source Control").click()
+
+   page.get_by_role('option', name="Our Source").click()
+
+   page.get_by_role("button", name= "Next").click()
+
+   # HEADER DETAILS ARE AT 0 SO SKIPPED
+
+   page.get_by_role("button", name="Next").click()
+
+   # Column Details
+
+#COLUMN 1
+
+   page.get_by_placeholder("Column Name as per Source").fill("Amount_Autotest")
+
+   page.get_by_placeholder("Column Name for Display").fill("Amount")
+
+   # Select the 'Number' option from the first select dropdown
+
+   page.locator("select.native-select").nth(0).select_option("Number")
+
+   page.locator('input[placeholder="Length"]').fill("6")
+
+# COLUMN 2
+
+   page.get_by_role("button", name="Add Row").click()
+
+   page.get_by_placeholder("Column Name as per Source").nth(1).fill("Name_Autotest")
+
+   page.get_by_placeholder("Column Name for Display").nth(1).fill("Name")
+
+   page.locator('input[placeholder="Length"]').nth(1).fill("6")
+
+   # Save the output
+
+   page.get_by_text("Save").click()
+
+# Wait for the successful creation pop-up message
+
+   successful_creation = page.locator("text=Source added successfully & sent for approval")
+
+   successful_creation.wait_for(timeout=10000)
+
+   # Extract the inner text of the pop-up message
+
+   pop_up_message = successful_creation.inner_text()
+
+   # Use regex to extract the number (Source ID) from the message
+
+   match = re.search(r"Source ID: (\d+)", pop_up_message)
+
+   # Initialize the source_id variable to store the Source ID number
+
+   if match:
+
+       source_id = match.group(1)  # This extracts the Source ID number from the match
+
+       # Output the extracted Source ID for verification
+
+       print(f"The extracted Source ID is: {source_id}")
+
+   # Assuming you need to fill a field with the extracted Source ID
+
+   page.get_by_placeholder("Search").fill(source_id)
+
+   # To check view data
+
+   page.get_by_role("button",name="plagiarism").click()
+
+   page.get_by_role("button", name="Next").click()
+
+   page.get_by_role("button", name="Next").click()
+
+   page.get_by_role("button", name="Back to Table").click()
+
+   # To check edit data
+
+   page.get_by_placeholder("Search").fill(source_id)
+
+   page.get_by_role("button", name="edit_document").click()
+
+   page.get_by_role("button", name="Next").click()
+
+   page.get_by_role("button", name="Next").click()
+
+   page.get_by_text("Save").click()
+
+   expect(page.get_by_text("updated successfully")).to_be_visible()
+
+   print("Test Case Passed : Successful source creation")
+
+   context.tracing.stop(path="test_source_creation_postiveflow_view_modify.zip")
+
+#-----------------------------------------------------------------------------------------------------------------------
+# SOURCE CREATION NEGATIVE FLOW
+def test_source_creation_with_same_name_negativeflow(playwright: sync_playwright):
+    firefox_browser = playwright.firefox
+
+    browser = firefox_browser.launch(headless=False, slow_mo=1000)  # for slow navigation
+
+    context = browser.new_context()
+
+    context.tracing.start(screenshots=True, snapshots=True)
+
+    page = context.new_page()
+
+    # Login
+
+    page.goto("http://43.205.231.72:8080/levarusrecon/authentication/login")
+
+    page.get_by_placeholder("Email ID").fill("surya.a@levarus.com")
+
+    page.get_by_placeholder("Password").fill("1234")
+
+    page.get_by_text("submit").click()
+
+    # Hover over Basic Recon Setup (second match is usually the visible one)
+
+    page.locator("span:has-text('Basic Recon Setup')").nth(1).hover()
+
+    # Click Source Data Configuration (second match or by class)
+
+    page.locator("span:has-text('Source Data Configuration')").nth(1).click()
+
+    page.get_by_role("button", name=" Add Source ").click()
+
+    page.get_by_placeholder("Source Name").fill("Auto_Testing")
+
+    # Click the 'Source Type' dropdown to open the options and select file upload
+
+    page.get_by_role("combobox", name="Source Type").click()
+
+    page.get_by_role("option", name="File Upload").click()
+
+    # Click the 'File Type' dropdown to open the options and select Excel
+
+    page.get_by_role("combobox", name="File Type").click()
+
+    page.get_by_role("option", name="Excel").click()
+
+    # Click the 'Delimiter' dropdown to open the options and select 0
+
+    page.get_by_role("combobox", name="Delimiter").click()
+
+    page.get_by_role("option", name="0").click()
+
+    # Click the 'Status' dropdown to open the options and select Active
+
+    page.get_by_role('combobox', name="Status").click()
+
+    page.get_by_role('option', name="Inactive").click()
+
+    # Click the 'Source control' dropdown to open the options and select Our source
+
+    page.get_by_role('combobox', name="Source Control").click()
+
+    page.get_by_role('option', name="Our Source").click()
+
+    page.get_by_role("button", name="Next").click()
+
+    # HEADER DETAILS ARE AT 0 SO SKIPPED
+
+    page.get_by_role("button", name="Next").click()
+
+    page.get_by_role("button", name="Save").click()
+
+    try:
+
+        expect(
+
+            page.get_by_text("Source name should be unique. A source with this name already exists.")
+
+        ).to_be_visible()
+
+        # If the error message is visible, print the message indicating the source creation failed
+
+        print("Source file with the same name creation failed as expected.")
+
+    except Exception as e:
+
+        # Handle case where the error message is not visible (optional)
+
+        print("Error: Source file with the same name was not rejected.")
+
+        # Always stop tracing and save the trace file here (move this outside the try-except block)
+
+    context.tracing.stop(path="test_source_creation_negativeflow.zip")
+
+    # Close the browser after the test
+
+    browser.close()
+
+
+# ------------------------------------------Creation AND Auth------------------------------------------------------------
+
+
+Main_source = 0
+
+
+def test_source_creation_auth(playwright: sync_playwright):
+    firefox_browser = playwright.firefox
+
+    browser = firefox_browser.launch(headless=False, slow_mo=1000)  # for slow navigation
+
+    context = browser.new_context()
+
+    context.tracing.start(screenshots=True, snapshots=True)
+
+    page = context.new_page()
+
+    # Login
+
+    page.goto("http://43.205.231.72:8080/levarusrecon/authentication/login")
+
+    page.get_by_placeholder("Email ID").fill("surya.a@levarus.com")
+
+    page.get_by_placeholder("Password").fill("1234")
+
+    page.get_by_text("submit").click()
+
+    # Hover over Basic Recon Setup (second match is usually the visible one)
+
+    page.locator("span:has-text('Basic Recon Setup')").nth(1).hover()
+
+    # Click Source Data Configuration (second match or by class)
+
+    page.locator("span:has-text('Source Data Configuration')").nth(1).click()
+
+    page.get_by_role("button", name=" Add Source ").click()
+
+    randomnumber = random.randint(1, 100000)
+
+    page.get_by_placeholder("Source Name").fill(f"autotest_{randomnumber}")
+
+    # Click the 'Source Type' dropdown to open the options and select file upload
+
+    page.get_by_role("combobox", name="Source Type").click()
+
+    page.get_by_role("option", name="File Upload").click()
+
+    # Click the 'File Type' dropdown to open the options and select Excel
+
+    page.get_by_role("combobox", name="File Type").click()
+
+    page.get_by_role("option", name="Excel").click()
+
+    # Click the 'Delimiter' dropdown to open the options and select 0
+
+    page.get_by_role("combobox", name="Delimiter").click()
+
+    page.get_by_role("option", name="0").click()
+
+    # Click the 'Status' dropdown to open the options and select Active
+
+    page.get_by_role('combobox', name="Status").click()
+
+    page.locator('mat-option[role="option"]').nth(0).click()  # Selects the first option (Active is first)
+
+    # Click the 'Source control' dropdown to open the options and select Our source
+
+    page.get_by_role('combobox', name="Source Control").click()
+
+    page.get_by_role('option', name="Our Source").click()
+
+    page.get_by_role("button", name="Next").click()
+
+    # HEADER DETAILS ARE AT 0 SO SKIPPED
+
+    page.get_by_role("button", name="Next").click()
+
+    # Column Details
+
+    # COLUMN 1
+
+    page.get_by_placeholder("Column Name as per Source").fill("Amount_Autotest")
+
+    page.get_by_placeholder("Column Name for Display").fill("Amount")
+
+    # Select the 'Number' option from the first select dropdown
+
+    page.locator("select.native-select").nth(0).select_option("Number")
+
+    page.locator('input[placeholder="Length"]').fill("6")
+
+    # COLUMN 2
+
+    page.get_by_role("button", name="Add Row").click()
+
+    page.get_by_placeholder("Column Name as per Source").nth(1).fill("Name_Autotest")
+
+    page.get_by_placeholder("Column Name for Display").nth(1).fill("Name")
+
+    page.locator('input[placeholder="Length"]').nth(1).fill("6")
+
+    # Save the output
+
+    page.get_by_text("Save").click()
+
+    # Wait for the successful creation pop-up message
+
+    successful_creation = page.locator("text=Source added successfully & sent for approval")
+
+    successful_creation.wait_for(timeout=10000)
+
+    # Extract the inner text of the pop-up message
+
+    pop_up_message = successful_creation.inner_text()
+
+    # Use regex to extract the number (Source ID) from the message
+
+    match = re.search(r"Source ID: (\d+)", pop_up_message)
+
+    # Initialize the source_id variable to store the Source ID number
+
+    if match:
+        source_id = match.group(1)  # This extracts the Source ID number from the match
+
+        # Output the extracted Source ID for verification
+
+        print(f"The extracted Source ID is: {source_id}")
+
+        global Main_source
+
+        Main_source = source_id
+
+        page.locator("span:has-text('Authorization')").nth(0).hover()
+
+        page.locator("span:has-text('Transaction Approval')").nth(0).click()
+
+        time.sleep(5)
+
+        page.get_by_placeholder("Search").fill(Main_source)
+
+        page.get_by_placeholder("Search").press("Enter")
+
+        time.sleep(3)
+
+        page.get_by_role("button", name="priority").nth(0).click()
+
+    context.tracing.stop(path="test_source_creation_auth.zip")
+
+
+print(f"This is the main source id {Main_source}.")
+
+
+# ------------------------------------------Creation AND Rej------------------------------------------------------------
+
+
+def test_source_rejection(playwright: sync_playwright):
+    firefox_browser = playwright.firefox
+
+    browser = firefox_browser.launch(headless=False, slow_mo=1000)  # for slow navigation
+
+    context = browser.new_context()
+
+    context.tracing.start(screenshots=True, snapshots=True)
+
+    page = context.new_page()
+
+    # Login
+
+    page.goto("http://43.205.231.72:8080/levarusrecon/authentication/login")
+
+    page.get_by_placeholder("Email ID").fill("surya.a@levarus.com")
+
+    page.get_by_placeholder("Password").fill("1234")
+
+    page.get_by_text("submit").click()
+
+    # Hover over Basic Recon Setup (second match is usually the visible one)
+
+    page.locator("span:has-text('Basic Recon Setup')").nth(1).hover()
+
+    # Click Source Data Configuration (second match or by class)
+
+    page.locator("span:has-text('Source Data Configuration')").nth(1).click()
+
+    page.get_by_role("button", name=" Add Source ").click()
+
+    randomnumber = random.randint(1, 100000)
+
+    page.get_by_placeholder("Source Name").fill(f"autotest_{randomnumber}")
+
+    # Click the 'Source Type' dropdown to open the options and select file upload
+
+    page.get_by_role("combobox", name="Source Type").click()
+
+    page.get_by_role("option", name="File Upload").click()
+
+    # Click the 'File Type' dropdown to open the options and select Excel
+
+    page.get_by_role("combobox", name="File Type").click()
+
+    page.get_by_role("option", name="Excel").click()
+
+    # Click the 'Delimiter' dropdown to open the options and select 0
+
+    page.get_by_role("combobox", name="Delimiter").click()
+
+    page.get_by_role("option", name="0").click()
+
+    # Click the 'Status' dropdown to open the options and select Active
+
+    page.get_by_role('combobox', name="Status").click()
+
+    page.get_by_role('option', name="Inactive").click()
+
+    # Click the 'Source control' dropdown to open the options and select Our source
+
+    page.get_by_role('combobox', name="Source Control").click()
+
+    page.get_by_role('option', name="Our Source").click()
+
+    page.get_by_role("button", name="Next").click()
+
+    # HEADER DETAILS ARE AT 0 SO SKIPPED
+
+    page.get_by_role("button", name="Next").click()
+
+    # Column Details
+
+    # COLUMN 1
+
+    page.get_by_placeholder("Column Name as per Source").fill("Amount_Autotest")
+
+    page.get_by_placeholder("Column Name for Display").fill("Amount")
+
+    # Select the 'Number' option from the first select dropdown
+
+    page.locator("select.native-select").nth(0).select_option("Number")
+
+    page.locator('input[placeholder="Length"]').fill("6")
+
+    # COLUMN 2
+
+    page.get_by_role("button", name="Add Row").click()
+
+    page.get_by_placeholder("Column Name as per Source").nth(1).fill("Name_Autotest")
+
+    page.get_by_placeholder("Column Name for Display").nth(1).fill("Name")
+
+    page.locator('input[placeholder="Length"]').nth(1).fill("6")
+
+    # Save the output
+
+    page.get_by_text("Save").click()
+
+    # Wait for the successful creation pop-up message
+
+    successful_creation = page.locator("text=Source added successfully & sent for approval")
+
+    successful_creation.wait_for(timeout=10000)
+
+    # Extract the inner text of the pop-up message
+
+    pop_up_message = successful_creation.inner_text()
+
+    # Use regex to extract the number (Source ID) from the message
+
+    match = re.search(r"Source ID: (\d+)", pop_up_message)
+
+    # Initialize the source_id variable to store the Source ID number
+
+    if match:
+        source_id = match.group(1)  # This extracts the Source ID number from the match
+
+        # Output the extracted Source ID for verification
+
+        print(f"The extracted Source ID is: {source_id}")
+
+        global Main_source
+
+        Main_source = source_id
+
+        time.sleep(5)
+
+        page.locator("span:has-text('Authorization')").nth(0).hover()
+
+        page.locator("span:has-text('Transaction Approval')").nth(0).click()
+
+        time.sleep(5)
+
+        page.get_by_placeholder("Search").fill(source_id)
+
+        page.get_by_placeholder("Search").press("Enter")
+
+        time.sleep(2)
+
+        page.locator("mat-icon:has-text('edit')").click()
+
+        page.get_by_placeholder("Enter your remarks here (max 500 characters)").fill("This is a test rej")
+
+        page.get_by_role("button", name="Save").click()
+
+        page.get_by_role("button", name="tab_close").nth(0).click()
+
+    context.tracing.stop(path="test_source_rejection.zip")
+
+
+print(f"This is the main source id {Main_source}.")
+
+#--------------------------------------------------Rule creation--------------------------------------------------------
+import pytest
+from playwright.sync_api import sync_playwright
+import random
+import re
+from asyncio import wait_for
+from random import randint
+import page
+from playwright.sync_api import Page, expect, sync_playwright
+import time
+
+
+def test_rule_creation(playwright: sync_playwright):
+    # 1) Launch browser
+    browser = playwright.firefox.launch(headless=False, slow_mo=500)
+    context = browser.new_context()
+    context.tracing.start(screenshots=True, snapshots=True)
+    page = context.new_page()
+
+    # 2) Login
+    page.goto("http://43.205.231.72:8080/levarusrecon/authentication/login")
+    page.get_by_placeholder("Email ID").fill("surya.a@levarus.com")
+    page.get_by_placeholder("Password").fill("1234")
+    page.get_by_role("button", name="submit").click()
+    page.wait_for_load_state("networkidle")
+
+    # 3) Navigate to Recon Rule Maintenance
+    page.locator("span:has-text('Basic Recon Setup')").nth(1).hover()
+    page.locator("span:has-text('Recon Rule Maintenance')").nth(1).click()
+
+    # 4) Open Add Rules dialog
+    page.get_by_role("button", name="Add Rules").click()
+    random_number_forname = random.randint(100, 100000)
+    # 5) Fill step 1
+    page.locator('input[formcontrolname="processName"]').fill(f"Auto Test Name_{random_number_forname}")
+    page.locator('input[formcontrolname="reconGroup"]').click()
+    page.locator('div.dropdown-item:has-text("REPS")').first.click()
+    page.locator('input[formcontrolname="sourceType"]').click()
+    page.locator('div.dropdown-item:has-text("Three Way")').click()
+    page.locator('input[formcontrolname="activeStatus"]').click()
+    page.locator('div.dropdown-item:has-text("Yes")').click()
+    page.locator("text=Yes").nth(1).click()  # Primary = Yes
+
+    # 6–8) Fill Source File 1/2/3
+    for idx, src in enumerate(
+            ["3way1-1source1", "3way1-1source2", "3way1-1source3"], start=1
+    ):
+        sf = page.locator(f"text=Source File {idx}").locator("xpath=..").locator("input")
+        sf.wait_for(state="visible", timeout=5000)
+        sf.click()
+        sf.fill(src)
+        sf.press("Enter")
+
+    # 9) Next → Match Rules
+    page.get_by_role("button", name="Next").click()
+    page.wait_for_load_state("networkidle")
+
+    # 10) Select “Value Date” for Primary dropdown (first xpath)
+    primary_xpath = '/html/body/app-root/app-main-layout/div/app-recon-rule-maintenance/section/div/div[3]/div/div/mat-stepper/div/div[2]/div[2]/div[1]/form/div/div[2]/div/div[1]/table/tbody/tr[1]/td/select'
+    page.locator(f"xpath={primary_xpath}").select_option(label="Value Date", timeout=5000)
+
+    # 11) Select “Value Date” for Secondary dropdown (second xpath)
+    secondary_xpath = '/html/body/app-root/app-main-layout/div/app-recon-rule-maintenance/section/div/div[3]/div/div/mat-stepper/div/div[2]/div[2]/div[1]/form/div/div[2]/div/div[2]/table/tbody/tr[1]/td[1]/select'
+    page.locator(f"xpath={secondary_xpath}").select_option(label="Value Date", timeout=5000)
+
+    # 12) Select “Value Date” for Secondary2 dropdown (third xpath)
+    secondary2_xpath = '/html/body/app-root/app-main-layout/div/app-recon-rule-maintenance/section/div/div[3]/div/div/mat-stepper/div/div[2]/div[2]/div[1]/form/div/div[2]/div/div[3]/table/tbody/tr[1]/td[1]/select'
+    page.locator(f"xpath={secondary2_xpath}").select_option(label="Value Date", timeout=5000)
+
+    # 13) Add a new mapping row
+    before_count = page.locator("select.form-control").count()
+    page.get_by_role("button", name="Add Row").click()
+
+    # 14) Select “Amount” for Primary dropdown (second row)
+    amount_primary_xpath = '/html/body/app-root/app-main-layout/div/app-recon-rule-maintenance/section/div/div[3]/div/div/mat-stepper/div/div[2]/div[2]/div[1]/form/div/div[2]/div/div[1]/table/tbody/tr[2]/td/select'
+    page.locator(f"xpath={amount_primary_xpath}").select_option(label="Amount", timeout=5000)
+
+    # 15) Select “Amount” for Secondary dropdown (second row)
+    amount_secondary_xpath = '/html/body/app-root/app-main-layout/div/app-recon-rule-maintenance/section/div/div[3]/div/div/mat-stepper/div/div[2]/div[2]/div[1]/form/div/div[2]/div/div[2]/table/tbody/tr[2]/td[1]/select'
+    page.locator(f"xpath={amount_secondary_xpath}").select_option(label="Amount", timeout=5000)
+
+    # 16) Select “Amount” for Secondary2 dropdown (second row)
+    amount_secondary2_xpath = '/html/body/app-root/app-main-layout/div/app-recon-rule-maintenance/section/div/div[3]/div/div/mat-stepper/div/div[2]/div[2]/div[1]/form/div/div[2]/div/div[3]/table/tbody/tr[2]/td[1]/select'
+    page.locator(f"xpath={amount_secondary2_xpath}").select_option(label="Amount", timeout=5000)
+
+    # 17) Add a new mapping row
+    before_count = page.locator("select.form-control").count()
+    page.get_by_role("button", name="Add Row").click()
+
+    # 18) Select “Account Number” for Primary dropdown (third row)
+    account_primary_xpath = '/html/body/app-root/app-main-layout/div/app-recon-rule-maintenance/section/div/div[3]/div/div/mat-stepper/div/div[2]/div[2]/div[1]/form/div/div[2]/div/div[1]/table/tbody/tr[3]/td/select'
+    page.locator(f"xpath={account_primary_xpath}").select_option(label="Account Number", timeout=5000)
+
+    # 19) Select “Account Number” for Secondary dropdown (third row)
+    account_secondary_xpath = '/html/body/app-root/app-main-layout/div/app-recon-rule-maintenance/section/div/div[3]/div/div/mat-stepper/div/div[2]/div[2]/div[1]/form/div/div[2]/div/div[2]/table/tbody/tr[3]/td[1]/select'
+    page.locator(f"xpath={account_secondary_xpath}").select_option(label="Account Number", timeout=5000)
+
+    # 20) Select “Account Number” for Secondary2 dropdown (third row)
+    account_secondary2_xpath = '/html/body/app-root/app-main-layout/div/app-recon-rule-maintenance/section/div/div[3]/div/div/mat-stepper/div/div[2]/div[2]/div[1]/form/div/div[2]/div/div[3]/table/tbody/tr[3]/td[1]/select'
+    page.locator(f"xpath={account_secondary2_xpath}").select_option(label="Account Number", timeout=5000)
+
+    # 21) Click Update Rule button
+    page.get_by_role("button", name="Submit").click()
+    page.wait_for_timeout(2000)
+#------------------------------------------------END OF THE CODE--------------------------------------------------------
+
+#--------------------------------------------------TO RUN---------------------------------------------------------------
+"""
+def test_run_all():
+    with sync_playwright() as playwright:
+        test_login_page(playwright)
+        test_user_creation(playwright)
+        test_adhoc_run_auth(playwright)
+        test_source_creation_postiveflow_view_modify(playwright)
+        test_source_creation_with_same_name_negativeflow(playwright)
+        test_source_creation_auth(playwright)
+        test_source_rejection(playwright)
+        test_rule_creation(playwright)
+"""
